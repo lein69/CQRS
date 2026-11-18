@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>Đăng nhập | StudySpace</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div id="notice" class="notice" role="status" aria-live="polite"></div>
+
+  <section id="auth-view" class="auth-page">
+    <div class="auth-shell">
+      <aside class="auth-aside">
+        <a class="brand brand-light" href="/" aria-label="StudySpace trang chủ">
+          <span class="brand-mark">S</span>
+          <span>StudySpace</span>
+        </a>
+        <div class="auth-aside-copy">
+          <span class="auth-kicker"><span class="status-dot"></span> HỌC CÙNG NHAU, TIẾN XA HƠN</span>
+          <h1>Biến mỗi buổi học thành một bước tiến.</h1>
+          <p>Tìm những người cùng mục tiêu, tạo nhóm học tập và cùng nhau chinh phục môn học.</p>
+        </div>
+        <div class="study-preview" aria-label="Ví dụ nhóm học tập">
+          <div class="preview-topline">
+            <span class="preview-icon">G</span>
+            <span class="preview-label">NHÓM ĐANG HOẠT ĐỘNG</span>
+            <span class="preview-status">Đang mở</span>
+          </div>
+          <h2>Ôn tập Kiến trúc phần mềm</h2>
+          <p>Chia sẻ kiến thức. Cùng nhau hoàn thành mục tiêu.</p>
+          <div class="preview-bottom">
+            <div class="avatar-stack" aria-hidden="true">
+              <span>AN</span><span>MK</span><span>LT</span><span>+</span>
+            </div>
+            <span>3 / 5 thành viên</span>
+          </div>
+        </div>
+        <div class="aside-decoration aside-decoration-one"></div>
+        <div class="aside-decoration aside-decoration-two"></div>
+        <p class="aside-caption">Không gian học tập dành cho bạn.</p>
+      </aside>
+
+      <main class="auth-card">
+        <a class="brand brand-dark" href="/" aria-label="StudySpace">
+          <span class="brand-mark">S</span>
+          <span>StudySpace</span>
+        </a>
+        <div class="auth-heading">
+          <p class="eyebrow">CHÀO MỪNG BẠN</p>
+          <h2 id="auth-heading">Chào mừng trở lại</h2>
+          <p id="auth-description">Đăng nhập để tiếp tục hành trình học tập của bạn.</p>
+        </div>
+
+        <div class="auth-tabs" role="tablist" aria-label="Chọn hình thức tài khoản">
+          <button id="show-login" class="auth-tab is-active" type="button" role="tab" aria-controls="login-form" aria-selected="true">Đăng nhập</button>
+          <button id="show-register" class="auth-tab" type="button" role="tab" aria-controls="register-form" aria-selected="false">Tạo tài khoản</button>
+        </div>
+
+        <form id="login-form" class="auth-form" role="tabpanel" aria-labelledby="show-login">
+          <label>
+            Email
+            <input name="email" type="email" autocomplete="email" maxlength="320" placeholder="ten@email.com" required>
+          </label>
+          <label>
+            Mật khẩu
+            <input name="password" type="password" autocomplete="current-password" minlength="8" maxlength="128" placeholder="Nhập mật khẩu" required>
+          </label>
+          <button class="button button-primary auth-submit" type="submit">Đăng nhập</button>
+        </form>
+
+        <form id="register-form" class="auth-form" role="tabpanel" aria-labelledby="show-register" hidden>
+          <label>
+            Tên hiển thị
+            <input name="displayName" autocomplete="name" minlength="2" maxlength="100" placeholder="Tên của bạn" required>
+          </label>
+          <label>
+            Email
+            <input name="email" type="email" autocomplete="email" maxlength="320" placeholder="ten@email.com" required>
+          </label>
+          <label>
+            Mật khẩu
+            <input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="Ít nhất 8 ký tự" required>
+          </label>
+          <button class="button button-primary auth-submit" type="submit">Tạo tài khoản</button>
+        </form>
+
+        <div class="auth-security">
+          <span class="security-icon" aria-hidden="true">✓</span>
+          <span>Mật khẩu được bảo vệ an toàn</span>
+        </div>
+        <p class="auth-terms">Bằng việc tiếp tục, bạn đồng ý sử dụng tài khoản cho mục đích học tập.</p>
+      </main>
+    </div>
+  </section>
+
+  <div id="app-view" hidden>
+    <header class="site-header">
+      <div class="container header-content">
+        <div>
+          <p class="eyebrow">CQRS · EVENT-DRIVEN</p>
+          <h1>Nhóm học tập</h1>
+          <p class="subtitle">Tạo nhóm, gửi yêu cầu tham gia và duyệt thành viên.</p>
+        </div>
+        <div class="user-menu">
+          <div class="user-avatar" aria-hidden="true">S</div>
+          <div class="user-details">
+            <strong id="account-name"></strong>
+            <span id="account-email"></span>
+          </div>
+          <button id="logout-button" class="button button-header" type="button">Đăng xuất</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container app-content">
+      <nav class="workspace-tabs" role="tablist" aria-label="Điều hướng nhóm học tập">
+        <button class="workspace-tab is-active" id="tab-discover" type="button" role="tab"
+                aria-controls="discover-view" aria-selected="true" data-view="discover">
+          Khám phá nhóm
+        </button>
+        <button class="workspace-tab" id="tab-mine" type="button" role="tab"
+                aria-controls="mine-view" aria-selected="false" data-view="mine">
+          Nhóm của tôi <span id="my-groups-count" class="tab-count" hidden>0</span>
+        </button>
+        <button class="workspace-tab" id="tab-create" type="button" role="tab"
+                aria-controls="create-view" aria-selected="false" data-view="create">
+          <span class="tab-plus" aria-hidden="true">+</span> Tạo nhóm
+        </button>
+        <button class="workspace-tab" id="tab-guide" type="button" role="tab"
+                aria-controls="guide-view" aria-selected="false" data-view="guide">
+          Cách hoạt động
+        </button>
+      </nav>
+
+      <section id="discover-view" class="workspace-view" role="tabpanel" aria-labelledby="tab-discover">
+        <section class="section-block discover-section">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">KHÔNG GIAN HỌC TẬP</p>
+              <h2>Nhóm phù hợp với bạn</h2>
+              <p class="section-description">Tìm cộng đồng cùng môn học, xem lịch sinh hoạt và gửi yêu cầu tham gia.</p>
+            </div>
+            <button id="refresh-button" class="button button-muted" type="button">Làm mới</button>
+          </div>
+          <form id="search-form" class="search-bar">
+            <input name="search" aria-label="Tìm nhóm" placeholder="Tìm theo tên nhóm, môn học hoặc mục tiêu">
+            <button class="button button-primary" type="submit">Tìm kiếm</button>
+          </form>
+          <div id="groups" class="group-list">          </div>
+          <div class="pagination">
+            <button id="previous-page" class="button button-muted" type="button">Trước</button>
+            <span id="page-label">Trang 1</span>
+            <button id="next-page" class="button button-muted" type="button">Sau</button>
+          </div>
+        </section>
+      </section>
+
+      <section id="mine-view" class="workspace-view" role="tabpanel" aria-labelledby="tab-mine" hidden>
+        <div class="my-groups-heading">
+          <div>
+            <p class="eyebrow">KHÔNG GIAN CỦA BẠN</p>
+            <h2>Nhóm của tôi</h2>
+            <p>Theo dõi nhóm bạn quản lý, nhóm đã tham gia và các yêu cầu đang chờ phản hồi.</p>
+          </div>
+          <button id="refresh-my-groups" class="button button-muted" type="button">Làm mới</button>
+        </div>
+
+        <div class="my-group-stats" aria-label="Tổng quan nhóm của tôi">
+          <article class="my-group-stat">
+            <span class="stat-icon stat-icon-owner" aria-hidden="true">★</span>
+            <div><strong id="owned-group-count">0</strong><span>Nhóm làm chủ</span></div>
+          </article>
+          <article class="my-group-stat">
+            <span class="stat-icon stat-icon-member" aria-hidden="true">↗</span>
+            <div><strong id="joined-group-count">0</strong><span>Đã tham gia</span></div>
+          </article>
+          <article class="my-group-stat">
+            <span class="stat-icon stat-icon-pending" aria-hidden="true">◷</span>
+            <div><strong id="pending-request-count">0</strong><span>Yêu cầu đã gửi</span></div>
+          </article>
+          <article class="my-group-stat">
+            <span class="stat-icon stat-icon-review" aria-hidden="true">!</span>
+            <div><strong id="pending-review-count">0</strong><span>Cần bạn duyệt</span></div>
+          </article>
+        </div>
+
+        <section class="my-group-section">
+          <div class="my-group-section-heading">
+            <div>
+              <h3>Nhóm bạn làm chủ</h3>
+              <p>Quản lý các yêu cầu tham gia từ thành viên mới.</p>
+            </div>
+            <span class="section-count" id="owned-section-count">0 nhóm</span>
+          </div>
+          <div id="owned-groups" class="group-list"></div>
+        </section>
+
+        <section class="my-group-section">
+          <div class="my-group-section-heading">
+            <div>
+              <h3>Nhóm đã tham gia</h3>
+              <p>Các nhóm mà chủ nhóm đã duyệt bạn làm thành viên.</p>
+            </div>
+            <span class="section-count" id="joined-section-count">0 nhóm</span>
+          </div>
+          <div id="joined-groups" class="group-list"></div>
+        </section>
+
+        <section class="my-group-section">
+          <div class="my-group-section-heading">
+            <div>
+              <h3>Yêu cầu đang chờ duyệt</h3>
+              <p>Yêu cầu bạn đã gửi; nhóm sẽ xuất hiện trong danh sách đã tham gia sau khi được duyệt.</p>
+            </div>
+            <span class="section-count" id="pending-section-count">0 yêu cầu</span>
+          </div>
+          <div id="pending-requests" class="pending-request-list"></div>
+        </section>
+      </section>
+
+      <section id="create-view" class="workspace-view" role="tabpanel" aria-labelledby="tab-create" hidden>
+        <div class="create-intro">
+          <div>
+            <p class="eyebrow">BẮT ĐẦU CÙNG NHAU</p>
+            <h2>Tạo không gian học tập của bạn</h2>
+            <p>Chia sẻ mục tiêu, lịch học và hình thức gặp mặt để mọi người biết nhóm đang tìm kiếm điều gì.</p>
+          </div>
+          <div class="create-intro-icon" aria-hidden="true">✦</div>
+        </div>
+        <form id="create-form" class="create-form">
+          <section class="form-section">
+            <div class="form-section-heading">
+              <span class="form-section-number">01</span>
+              <div>
+                <h3>Thông tin nhóm</h3>
+                <p>Đặt tên và cho mọi người biết nhóm học môn gì.</p>
+              </div>
+            </div>
+            <div class="form-grid">
+              <label>
+                <span>Tên nhóm <span class="required-mark">*</span></span>
+                <input name="name" required minlength="2" maxlength="100" placeholder="Ví dụ: Cùng chinh phục Kiến trúc phần mềm">
+              </label>
+              <label>
+                <span>Môn học <span class="required-mark">*</span></span>
+                <input name="subject" required maxlength="100" placeholder="Ví dụ: Kiến trúc phần mềm">
+              </label>
+              <label class="span-two">
+                Mục tiêu học tập
+                <input name="goal" maxlength="300" placeholder="Ví dụ: Ôn thi cuối kỳ và hoàn thành bài tập lớn">
+              </label>
+              <label class="span-two">
+                Giới thiệu nhóm
+                <textarea name="description" maxlength="1000" rows="3" placeholder="Chia sẻ cách học, nội dung đang ôn hoặc điều bạn mong đợi ở nhóm..."></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <div class="form-section-heading">
+              <span class="form-section-number">02</span>
+              <div>
+                <h3>Lịch học & hình thức</h3>
+                <p>Giúp thành viên chủ động sắp xếp thời gian và địa điểm.</p>
+              </div>
+            </div>
+            <div class="form-grid">
+              <label>
+                Lịch sinh hoạt dự kiến
+                <input name="schedule" maxlength="200" placeholder="Ví dụ: Tối thứ 3 và thứ 6, 19:00-20:30">
+              </label>
+              <label>
+                Trình độ phù hợp
+                <select name="level">
+                  <option value="All">Mọi trình độ</option>
+                  <option value="Beginner">Mới bắt đầu</option>
+                  <option value="Intermediate">Đã có kiến thức cơ bản</option>
+                  <option value="Advanced">Nâng cao</option>
+                </select>
+              </label>
+              <label>
+                Hình thức học
+                <select name="meetingMode">
+                  <option value="Online">Trực tuyến</option>
+                  <option value="InPerson">Gặp trực tiếp</option>
+                  <option value="Hybrid">Linh hoạt cả hai</option>
+                </select>
+              </label>
+              <label>
+                Địa điểm / link họp
+                <input name="meetingLocation" maxlength="300" placeholder="Ví dụ: Google Meet hoặc thư viện trường">
+              </label>
+            </div>
+          </section>
+
+          <section class="form-section form-section-last">
+            <div class="form-section-heading">
+              <span class="form-section-number">03</span>
+              <div>
+                <h3>Quy mô nhóm</h3>
+                <p>Chọn số thành viên tối đa, bao gồm cả bạn.</p>
+              </div>
+            </div>
+            <div class="capacity-field">
+              <label for="max-members">Số thành viên tối đa</label>
+              <div class="capacity-control">
+                <input id="max-members" name="maxMembers" type="number" min="1" value="5" required>
+                <span>người</span>
+              </div>
+              <p>Nhóm nhỏ giúp mọi người có nhiều thời gian trao đổi hơn.</p>
+            </div>
+          </section>
+
+          <div class="form-actions">
+            <p><span class="required-mark">*</span> Thông tin bắt buộc</p>
+            <button class="button button-primary create-submit" type="submit">
+              <span aria-hidden="true">＋</span> Tạo nhóm học tập
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section id="guide-view" class="workspace-view" role="tabpanel" aria-labelledby="tab-guide" hidden>
+        <div class="guide-heading">
+          <p class="eyebrow">HỌC CÙNG NHAU DỄ DÀNG</p>
+          <h2>Cách StudySpace hoạt động</h2>
+          <p>Mỗi nhóm đều có chủ nhóm quản lý thành viên. Bạn có thể tạo nhóm hoặc xin tham gia một nhóm đang mở.</p>
+        </div>
+        <div class="guide-grid">
+          <article class="guide-card">
+            <span class="guide-icon guide-icon-blue" aria-hidden="true">01</span>
+            <h3>Tạo nhóm học tập</h3>
+            <p>Chia sẻ môn học, mục tiêu và lịch dự kiến. Người tạo nhóm tự động trở thành chủ nhóm.</p>
+          </article>
+          <article class="guide-card">
+            <span class="guide-icon guide-icon-teal" aria-hidden="true">02</span>
+            <h3>Gửi yêu cầu tham gia</h3>
+            <p>Tìm nhóm phù hợp và gửi lời nhắn ngắn để giới thiệu mong muốn tham gia của bạn.</p>
+          </article>
+          <article class="guide-card">
+            <span class="guide-icon guide-icon-violet" aria-hidden="true">03</span>
+            <h3>Chủ nhóm duyệt thành viên</h3>
+            <p>Chủ nhóm xem các yêu cầu đang chờ và quyết định duyệt hoặc từ chối. Thành viên không thể duyệt thay chủ nhóm.</p>
+          </article>
+        </div>
+        <div class="guide-note">
+          <span class="security-icon" aria-hidden="true">✓</span>
+          <p><strong>Quyền truy cập rõ ràng</strong><br>Chỉ chủ nhóm được xem và xử lý danh sách yêu cầu tham gia. Các hoạt động của nhóm được đồng bộ qua hệ thống sự kiện.</p>
+        </div>
+      </section>
+
+      <p class="demo-note">Tài khoản được lưu trong SQL Server. Mật khẩu được băm; API dùng JWT bearer token để xác thực.</p>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,77 @@
+@CommandService_HostAddress = http://localhost:5088
+@QueryService_HostAddress = http://localhost:5135
+@token = paste-access-token-here
+@groupId = paste-group-guid-here
+@requestId = paste-request-guid-here
+
+### Register and receive an access token
+POST {{CommandService_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "displayName": "Nguyen Van A",
+  "email": "student@example.com",
+  "password": "StudyGroup!2026"
+}
+
+### Login and receive an access token
+POST {{CommandService_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "student@example.com",
+  "password": "StudyGroup!2026"
+}
+
+### Get the current account
+GET {{CommandService_HostAddress}}/api/auth/me
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### Create a group as the authenticated user
+POST {{CommandService_HostAddress}}/api/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Study Group",
+  "subject": "Software Architecture",
+  "goal": "Review for the final exam and complete the course project",
+  "description": "Review microservice concepts",
+  "schedule": "Tuesday and Friday, 7:00-8:30 PM",
+  "meetingMode": "Online",
+  "meetingLocation": "Google Meet",
+  "level": "All",
+  "maxMembers": 5
+}
+
+### Request to join a group as the authenticated user
+POST {{CommandService_HostAddress}}/api/groups/{{groupId}}/join-requests
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "message": "I would like to join this group."
+}
+
+### Approve a pending request as the group owner
+POST {{CommandService_HostAddress}}/api/groups/{{groupId}}/join-requests/{{requestId}}/approve
+Authorization: Bearer {{token}}
+
+### Reject a pending request as the group owner
+POST {{CommandService_HostAddress}}/api/groups/{{groupId}}/join-requests/{{requestId}}/reject
+Authorization: Bearer {{token}}
+
+### Search groups
+GET {{QueryService_HostAddress}}/api/groups?page=1&pageSize=20
+Accept: application/json
+
+### Get groups and pending requests for the authenticated account
+GET {{QueryService_HostAddress}}/api/groups/mine
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### Read pending requests as the group owner
+GET {{QueryService_HostAddress}}/api/groups/{{groupId}}/join-requests?status=Pending
+Authorization: Bearer {{token}}
+Accept: application/json

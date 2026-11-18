@@ -1,0 +1,16 @@
+@QueryService_HostAddress = http://localhost:5135
+@token = paste-access-token-here
+@groupId = paste-group-guid-here
+
+### Public group search
+GET {{QueryService_HostAddress}}/api/groups?page=1&pageSize=20
+Accept: application/json
+
+### Public group details
+GET {{QueryService_HostAddress}}/api/groups/{{groupId}}
+Accept: application/json
+
+### Owner-only pending requests
+GET {{QueryService_HostAddress}}/api/groups/{{groupId}}/join-requests?status=Pending
+Authorization: Bearer {{token}}
+Accept: application/json
