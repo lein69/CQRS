@@ -22,6 +22,8 @@ The HTTP ports above are project launch-profile defaults. There is no API Gatewa
 | CommandService | POST | `/api/auth/login` | `LoginRequest` body | `AuthenticationResponse`; 200, 400, 401 |
 | CommandService | GET | `/api/auth/me` | Bearer token | `UserProfileResponse`; 200, 401 |
 | CommandService | POST | `/api/groups` | `CreateStudyGroupRequest` body and bearer token | `StudyGroup`; 201, 400, 401 |
+| CommandService | DELETE | `/api/groups/{groupId}` | Route ID and owner bearer token | 204, 401, 403, 404; permanently deletes the group and related members/requests |
+| CommandService | DELETE | `/api/groups/{groupId}/members/me` | Route ID and member bearer token | 204, 401, 404, 409; group owners cannot use the member-leave operation |
 | QueryService | GET | `/api/groups/mine` | Bearer token | Owned groups, joined groups, pending requests sent by the user, and pending review count for owned groups; 200, 401 |
 | CommandService | POST | `/api/groups/{groupId}/join-requests` | `CreateJoinRequestRequest` body and bearer token | `JoinRequest`; 201, 400, 401, 404, 409 |
 | CommandService | POST | `/api/groups/{groupId}/join-requests/{requestId}/approve` | Route IDs and bearer token; no body | `JoinRequest`; 200, 401, 403, 404, 409 |
@@ -47,6 +49,7 @@ No health-check endpoint, metrics exporter, or tracing endpoint is configured.
 - `RegisterRequest` and `LoginRequest` are immutable request records. Passwords are accepted only by the authentication endpoints and are never included in account responses.
 - `UserProfileResponse` exposes account ID, display name, email, and creation time. `AuthenticationResponse` returns this profile with a bearer access token and expiry.
 - `CreateStudyGroupRequest` contains the group name, subject, goal, description, schedule, meeting mode, meeting location, level, and maximum member count. Owner and member IDs are derived from the validated JWT subject, not accepted from the request body.
+- Group projections include `OwnerDisplayName`; new groups take the display name from the signed JWT name claim. Existing SQL group rows are backfilled from `Accounts` and the change is propagated through the outbox.
 - `StudyGroup` and `JoinRequest` are command-side models returned by group commands. `StudyGroupReadModel` and `JoinRequestReadModel` are query-side MongoDB projections.
 - `StudyGroupCreatedEvent` and `StudyGroupEvent` are event contracts duplicated in CommandService and ConsumerService. Event type names and JSON property names are the cross-service contract; no schema registry or contract version field is present.
 - CommandService serializes enum values as strings in HTTP responses. Swashbuckle generates OpenAPI at runtime; no checked-in OpenAPI or protobuf schema was found.
@@ -57,6 +60,7 @@ No health-check endpoint, metrics exporter, or tracing endpoint is configured.
 - **Asynchronous:** group writes place event payloads into SQL `OutboxMessages` in the same transaction as the domain write. `OutboxPublisher` polls pending messages and publishes keyed events to `study-group-events`. ConsumerService upserts the MongoDB projections.
 - **Authentication:** CommandService stores email and PBKDF2-HMAC-SHA256 password hashes in SQL Server and issues 60-minute HMAC-SHA256 JWTs. QueryService validates the issuer, audience, signature, and expiry using the same signing key. The key must be supplied through local user-secrets or environment configuration, not committed to source control. The demo UI keeps the token in browser `sessionStorage`.
 - **Authorization:** the command API derives the actor ID from the token subject. QueryService checks the same subject against the projected group owner before returning join requests. Group search and detail reads remain public.
+- **Group lifecycle:** owner deletion removes SQL group/member/request rows in one transaction and writes a `GroupDeleted` outbox event; the consumer removes the corresponding MongoDB projections. A member leave removes that member, marks the approved join request cancelled, and publishes `MemberLeft` to update the read projection and member count. Both changes are eventually consistent on the query side.
 - **Retry and delivery:** the outbox publisher polls every second and waits three seconds after a publish or database error. ConsumerService disables auto-commit, commits only after processing, and seeks back to a failed message before a two-second retry delay. Projection upserts make repeated events idempotent. There is no circuit breaker, dead-letter topic, or explicit database command timeout policy.
 - **Discovery and gateway:** services use configured local endpoints; service discovery and API Gateway are absent.
 - **Transport:** local HTTPS launch profiles and HTTPS redirection are configured for the APIs. Local Kafka uses plaintext; this setup is for a classroom demo and is not production deployment guidance.

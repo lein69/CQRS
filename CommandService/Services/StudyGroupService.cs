@@ -31,6 +31,8 @@ namespace CommandService.Services
 						MeetingLocation nvarchar(300) NOT NULL CONSTRAINT DF_StudyGroups_MeetingLocation DEFAULT N'',
 						Level nvarchar(20) NOT NULL CONSTRAINT DF_StudyGroups_Level DEFAULT N'All',
 						OwnerId uniqueidentifier NOT NULL,
+						OwnerDisplayName nvarchar(100) NOT NULL
+							CONSTRAINT DF_StudyGroups_OwnerDisplayName DEFAULT N'',
 						MaxMembers int NOT NULL,
 						Status nvarchar(20) NOT NULL,
 						CreatedAtUtc datetime2 NOT NULL,
@@ -58,6 +60,9 @@ namespace CommandService.Services
 				IF COL_LENGTH(N'dbo.StudyGroups', N'Level') IS NULL
 					ALTER TABLE dbo.StudyGroups ADD Level nvarchar(20) NOT NULL
 						CONSTRAINT DF_StudyGroups_Level DEFAULT N'All' WITH VALUES;
+				IF COL_LENGTH(N'dbo.StudyGroups', N'OwnerDisplayName') IS NULL
+					ALTER TABLE dbo.StudyGroups ADD OwnerDisplayName nvarchar(100) NOT NULL
+						CONSTRAINT DF_StudyGroups_OwnerDisplayName DEFAULT N'' WITH VALUES;
 
 				IF NOT EXISTS (
 					SELECT 1 FROM sys.check_constraints
@@ -132,21 +137,72 @@ namespace CommandService.Services
 						ON dbo.OutboxMessages (CreatedAtUtc)
 						WHERE ProcessedAtUtc IS NULL;
 				END;
+
 				""";
 
 			await using var connection = new SqlConnection(_connectionString);
 			await connection.OpenAsync();
-			await using var command = new SqlCommand(sql, connection);
-			await command.ExecuteNonQueryAsync();
+			await using (var command = new SqlCommand(sql, connection))
+			{
+				await command.ExecuteNonQueryAsync();
+			}
+
+			const string backfillOwnerNamesSql = """
+				DECLARE @UpdatedOwners TABLE (
+					GroupId uniqueidentifier NOT NULL,
+					OwnerDisplayName nvarchar(100) NOT NULL
+				);
+
+				UPDATE sg
+				SET OwnerDisplayName = accounts.DisplayName
+				OUTPUT inserted.Id, inserted.OwnerDisplayName
+					INTO @UpdatedOwners (GroupId, OwnerDisplayName)
+				FROM dbo.StudyGroups AS sg
+				INNER JOIN dbo.Accounts AS accounts ON accounts.Id = sg.OwnerId
+				WHERE sg.OwnerDisplayName = N'';
+
+				INSERT INTO dbo.OutboxMessages
+					(Id, EventType, AggregateId, Payload, CreatedAtUtc)
+				SELECT
+					NEWID(),
+					N'StudyGroupOwnerUpdated',
+					updated.GroupId,
+					(
+						SELECT
+							NEWID() AS EventId,
+							N'StudyGroupOwnerUpdated' AS EventType,
+							updated.GroupId AS AggregateId,
+							JSON_QUERY((
+								SELECT
+									updated.GroupId AS GroupId,
+									updated.OwnerDisplayName AS OwnerDisplayName
+								FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+							)) AS Data,
+							SYSUTCDATETIME() AS CreatedAtUtc
+						FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+					),
+					SYSUTCDATETIME()
+				FROM @UpdatedOwners AS updated;
+				""";
+			await using var backfillCommand = new SqlCommand(
+				backfillOwnerNamesSql,
+				connection);
+			await backfillCommand.ExecuteNonQueryAsync();
 		}
 
 		public async Task<StudyGroup> CreateAsync(
 			CreateStudyGroupRequest request,
-			Guid ownerId)
+			Guid ownerId,
+			string ownerDisplayName)
 		{
 			if (ownerId == Guid.Empty)
 			{
 				throw new ArgumentException("OwnerId must be a non-empty GUID.");
+			}
+
+			if (string.IsNullOrWhiteSpace(ownerDisplayName))
+			{
+				throw new ArgumentException("Owner display name must not be empty.");
 			}
 
 			var group = new StudyGroup
@@ -160,16 +216,18 @@ namespace CommandService.Services
 				MeetingLocation = request.MeetingLocation.Trim(),
 				Level = request.Level,
 				OwnerId = ownerId,
+				OwnerDisplayName = ownerDisplayName.Trim(),
 				MaxMembers = request.MaxMembers
 			};
 
 			const string insertGroupSql = """
 				INSERT INTO dbo.StudyGroups
 					(Id, Name, Description, Goal, Subject, Schedule, MeetingMode,
-						MeetingLocation, Level, OwnerId, MaxMembers, Status, CreatedAtUtc)
+						MeetingLocation, Level, OwnerId, OwnerDisplayName, MaxMembers, Status, CreatedAtUtc)
 				VALUES
 					(@Id, @Name, @Description, @Goal, @Subject, @Schedule, @MeetingMode,
-						@MeetingLocation, @Level, @OwnerId, @MaxMembers, @Status, @CreatedAtUtc);
+						@MeetingLocation, @Level, @OwnerId, @OwnerDisplayName, @MaxMembers,
+						@Status, @CreatedAtUtc);
 				""";
 			const string insertOwnerSql = """
 				INSERT INTO dbo.GroupMembers (Id, GroupId, UserId, Role, JoinedAtUtc)
@@ -198,6 +256,7 @@ namespace CommandService.Services
 					MeetingLocation = group.MeetingLocation,
 					Level = group.Level,
 					OwnerId = group.OwnerId,
+					OwnerDisplayName = group.OwnerDisplayName,
 					MaxMembers = group.MaxMembers,
 					Status = group.Status.ToString(),
 					CreatedAtUtc = group.CreatedAtUtc
@@ -222,6 +281,7 @@ namespace CommandService.Services
 					command.Parameters.AddWithValue("@MeetingLocation", group.MeetingLocation);
 					command.Parameters.AddWithValue("@Level", group.Level);
 					command.Parameters.AddWithValue("@OwnerId", group.OwnerId);
+					command.Parameters.AddWithValue("@OwnerDisplayName", group.OwnerDisplayName);
 					command.Parameters.AddWithValue("@MaxMembers", group.MaxMembers);
 					command.Parameters.AddWithValue("@Status", group.Status.ToString());
 					command.Parameters.AddWithValue("@CreatedAtUtc", group.CreatedAtUtc);
@@ -249,6 +309,156 @@ namespace CommandService.Services
 
 				await transaction.CommitAsync();
 				return group;
+			}
+			catch
+			{
+				await transaction.RollbackAsync();
+				throw;
+			}
+		}
+
+		public async Task DeleteAsync(Guid groupId, Guid ownerId)
+		{
+			if (ownerId == Guid.Empty)
+			{
+				throw new ArgumentException("OwnerId must be a non-empty GUID.");
+			}
+
+			await using var connection = new SqlConnection(_connectionString);
+			await connection.OpenAsync();
+			await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync();
+			try
+			{
+				var group = await GetGroupForUpdateAsync(connection, transaction, groupId);
+				if (group.OwnerId != ownerId)
+				{
+					throw new StudyGroupAccessDeniedException();
+				}
+
+				var deletionEventId = await InsertGroupEventAsync(
+					connection,
+					transaction,
+					"GroupDeleted",
+					groupId,
+					Guid.Empty,
+					0);
+
+				const string deletePriorOutboxSql = """
+					DELETE FROM dbo.OutboxMessages
+					WHERE AggregateId = @GroupId AND Id <> @DeletionEventId;
+					""";
+				await using (var command = new SqlCommand(
+					deletePriorOutboxSql,
+					connection,
+					transaction))
+				{
+					command.Parameters.AddWithValue("@GroupId", groupId);
+					command.Parameters.AddWithValue("@DeletionEventId", deletionEventId);
+					await command.ExecuteNonQueryAsync();
+				}
+
+				foreach (var sql in new[]
+				{
+					"DELETE FROM dbo.JoinRequests WHERE GroupId = @GroupId;",
+					"DELETE FROM dbo.GroupMembers WHERE GroupId = @GroupId;",
+					"DELETE FROM dbo.StudyGroups WHERE Id = @GroupId;"
+				})
+				{
+					await using var command = new SqlCommand(sql, connection, transaction);
+					command.Parameters.AddWithValue("@GroupId", groupId);
+					await command.ExecuteNonQueryAsync();
+				}
+
+				await transaction.CommitAsync();
+			}
+			catch
+			{
+				await transaction.RollbackAsync();
+				throw;
+			}
+		}
+
+		public async Task LeaveAsync(Guid groupId, Guid userId)
+		{
+			if (userId == Guid.Empty)
+			{
+				throw new ArgumentException("UserId must be a non-empty GUID.");
+			}
+
+			await using var connection = new SqlConnection(_connectionString);
+			await connection.OpenAsync();
+			await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync();
+			try
+			{
+				_ = await GetGroupForUpdateAsync(connection, transaction, groupId);
+				const string memberRoleSql = """
+					SELECT Role
+					FROM dbo.GroupMembers WITH (UPDLOCK, HOLDLOCK)
+					WHERE GroupId = @GroupId AND UserId = @UserId;
+					""";
+				string? role;
+				await using (var command = new SqlCommand(
+					memberRoleSql,
+					connection,
+					transaction))
+				{
+					command.Parameters.AddWithValue("@GroupId", groupId);
+					command.Parameters.AddWithValue("@UserId", userId);
+					role = (string?)await command.ExecuteScalarAsync();
+				}
+
+				if (role is null)
+				{
+					throw new StudyGroupRuleViolationException(
+						"User is not a member of this study group.");
+				}
+
+				if (role == "Owner")
+				{
+					throw new StudyGroupRuleViolationException(
+						"Group owners must delete the group instead of leaving it.");
+				}
+
+				const string deleteMemberSql = """
+					DELETE FROM dbo.GroupMembers
+					WHERE GroupId = @GroupId AND UserId = @UserId;
+					""";
+				await using (var command = new SqlCommand(
+					deleteMemberSql,
+					connection,
+					transaction))
+				{
+					command.Parameters.AddWithValue("@GroupId", groupId);
+					command.Parameters.AddWithValue("@UserId", userId);
+					await command.ExecuteNonQueryAsync();
+				}
+
+				const string cancelApprovedRequestsSql = """
+					UPDATE dbo.JoinRequests
+					SET Status = N'Cancelled'
+					WHERE GroupId = @GroupId
+						AND UserId = @UserId
+						AND Status = N'Approved';
+					""";
+				await using (var command = new SqlCommand(
+					cancelApprovedRequestsSql,
+					connection,
+					transaction))
+				{
+					command.Parameters.AddWithValue("@GroupId", groupId);
+					command.Parameters.AddWithValue("@UserId", userId);
+					await command.ExecuteNonQueryAsync();
+				}
+
+				var memberCount = await GetMemberCountAsync(connection, transaction, groupId);
+				await InsertGroupEventAsync(
+					connection,
+					transaction,
+					"MemberLeft",
+					groupId,
+					userId,
+					memberCount);
+				await transaction.CommitAsync();
 			}
 			catch
 			{
@@ -590,6 +800,44 @@ namespace CommandService.Services
 			command.Parameters.AddWithValue("@Payload", JsonSerializer.Serialize(@event));
 			command.Parameters.AddWithValue("@CreatedAtUtc", @event.CreatedAtUtc);
 			await command.ExecuteNonQueryAsync();
+		}
+
+		private static async Task<Guid> InsertGroupEventAsync(
+			SqlConnection connection,
+			SqlTransaction transaction,
+			string eventType,
+			Guid groupId,
+			Guid userId,
+			int memberCount)
+		{
+			var @event = new StudyGroupEvent
+			{
+				EventId = Guid.NewGuid(),
+				EventType = eventType,
+				AggregateId = groupId,
+				CreatedAtUtc = DateTime.UtcNow,
+				Data = new StudyGroupEventData
+				{
+					GroupId = groupId,
+					UserId = userId,
+					Status = eventType == "GroupDeleted" ? "Deleted" : "Left",
+					MemberCount = memberCount
+				}
+			};
+			const string sql = """
+				INSERT INTO dbo.OutboxMessages
+					(Id, EventType, AggregateId, Payload, CreatedAtUtc)
+				VALUES
+					(@Id, @EventType, @AggregateId, @Payload, @CreatedAtUtc);
+				""";
+			await using var command = new SqlCommand(sql, connection, transaction);
+			command.Parameters.AddWithValue("@Id", @event.EventId);
+			command.Parameters.AddWithValue("@EventType", @event.EventType);
+			command.Parameters.AddWithValue("@AggregateId", @event.AggregateId);
+			command.Parameters.AddWithValue("@Payload", JsonSerializer.Serialize(@event));
+			command.Parameters.AddWithValue("@CreatedAtUtc", @event.CreatedAtUtc);
+			await command.ExecuteNonQueryAsync();
+			return @event.EventId;
 		}
 
 	}

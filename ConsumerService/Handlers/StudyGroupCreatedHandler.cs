@@ -31,6 +31,7 @@ namespace ConsumerService.Handlers
 				MeetingLocation = @event.Data.MeetingLocation,
 				Level = @event.Data.Level,
 				OwnerId = @event.Data.OwnerId,
+				OwnerDisplayName = @event.Data.OwnerDisplayName,
 				MaxMembers = @event.Data.MaxMembers,
 				MemberCount = 1,
 				Status = @event.Data.Status,
@@ -49,6 +50,48 @@ namespace ConsumerService.Handlers
 			StudyGroupEvent @event,
 			CancellationToken cancellationToken)
 		{
+			if (@event.EventType == "GroupDeleted")
+			{
+				await _groups.DeleteOneAsync(
+					group => group.Id == @event.Data.GroupId,
+					cancellationToken);
+				await _joinRequests.DeleteManyAsync(
+					request => request.GroupId == @event.Data.GroupId,
+					cancellationToken);
+				return;
+			}
+
+			if (@event.EventType == "StudyGroupOwnerUpdated")
+			{
+				await _groups.UpdateOneAsync(
+					group => group.Id == @event.Data.GroupId,
+					Builders<StudyGroupReadModel>.Update.Set(
+						group => group.OwnerDisplayName,
+						@event.Data.OwnerDisplayName),
+					cancellationToken: cancellationToken);
+				return;
+			}
+
+			if (@event.EventType == "MemberLeft")
+			{
+				await _joinRequests.UpdateManyAsync(
+					request =>
+						request.GroupId == @event.Data.GroupId &&
+						request.UserId == @event.Data.UserId &&
+						request.Status == "Approved",
+					Builders<JoinRequestReadModel>.Update.Set(
+						request => request.Status,
+						"Cancelled"),
+					cancellationToken: cancellationToken);
+				await _groups.UpdateOneAsync(
+					group => group.Id == @event.Data.GroupId,
+					Builders<StudyGroupReadModel>.Update.Set(
+						group => group.MemberCount,
+						@event.Data.MemberCount),
+					cancellationToken: cancellationToken);
+				return;
+			}
+
 			var request = new JoinRequestReadModel
 			{
 				Id = @event.Data.RequestId,

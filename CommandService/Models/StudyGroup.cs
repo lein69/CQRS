@@ -18,6 +18,7 @@ namespace CommandService.Models
 		public string MeetingLocation { get; set; } = string.Empty;
 		public string Level { get; set; } = "All";
 		public Guid OwnerId { get; set; }
+		public string OwnerDisplayName { get; set; } = string.Empty;
 		public int MaxMembers { get; set; }
 		public StudyGroupStatus Status { get; set; } = StudyGroupStatus.Active;
 		public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;

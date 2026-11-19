@@ -63,12 +63,15 @@ namespace ConsumerService
 						case "JoinRequested":
 						case "JoinRequestApproved":
 						case "JoinRequestRejected":
-							var joinRequestEvent = JsonSerializer.Deserialize<StudyGroupEvent>(
+						case "MemberLeft":
+						case "GroupDeleted":
+						case "StudyGroupOwnerUpdated":
+							var studyGroupEvent = JsonSerializer.Deserialize<StudyGroupEvent>(
 								message.Message.Value)
 								?? throw new JsonException(
-									"Join request event payload was empty.");
+									"Study group event payload was empty.");
 							await _studyGroupCreatedHandler.HandleAsync(
-								joinRequestEvent,
+								studyGroupEvent,
 								stoppingToken);
 							break;
 						default:

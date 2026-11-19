@@ -50,6 +50,7 @@ erDiagram
         string MeetingLocation
         string Level
         uuid OwnerId
+        string OwnerDisplayName
         int MaxMembers
         string Status
         datetime CreatedAtUtc
@@ -90,6 +91,7 @@ erDiagram
         string MeetingLocation
         string Level
         uuid OwnerId
+        string OwnerDisplayName
         int MaxMembers
         int MemberCount
         string Status
@@ -117,7 +119,7 @@ erDiagram
 |---|---|---|---|
 | CommandService | `AuthenticationService` in `CommandService/Services/AuthenticationService.cs` | `RegisterAsync`; `LoginAsync`; `GetByIdAsync` | Create accounts, verify password hashes, issue JWTs, and load the authenticated account |
 | QueryService | `StudyGroupRepository` in `QueryService/Repositories/StudyGroupRepository.cs` | `SearchAsync(search, page, pageSize)`; `GetByIdAsync(id)`; `GetJoinRequestsAsync(groupId, status)` | Search and page group projections, load one group, and filter projected requests |
-| CommandService | `StudyGroupService` in `CommandService/Services/StudyGroupService.cs` | `CreateAsync`; `CreateJoinRequestAsync`; `ReviewJoinRequestAsync` | Execute transactional SQL commands and append corresponding outbox events |
+| CommandService | `StudyGroupService` in `CommandService/Services/StudyGroupService.cs` | `CreateAsync`; `CreateJoinRequestAsync`; `ReviewJoinRequestAsync`; `DeleteAsync`; `LeaveAsync` | Execute transactional SQL commands and append corresponding outbox events |
 | CommandService | `OutboxPublisher` in `CommandService/Services/OutboxPublisher.cs` | `GetNextPendingAsync`; `MarkProcessedAsync` | Poll and mark outbox events around Kafka publication |
 | ConsumerService | `StudyGroupCreatedHandler` in `ConsumerService/Handlers/StudyGroupCreatedHandler.cs` | `HandleAsync(StudyGroupCreatedEvent)`; `HandleAsync(StudyGroupEvent)` | Idempotently upsert group and request projections |
 

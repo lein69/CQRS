@@ -194,7 +194,7 @@ function renderGroup(group, membershipRole = null) {
     meta,
     "span",
     "",
-    `Chủ nhóm: ${isOwner ? "Bạn" : "thành viên"}`
+    `Chủ nhóm: ${group.ownerDisplayName || (isOwner ? currentUser.displayName : "Chủ nhóm")}`
   );
   card.append(meta);
 
@@ -203,6 +203,9 @@ function renderGroup(group, membershipRole = null) {
     actions.className = "card-actions";
     if (isOwner) {
       addButton(actions, "Yêu cầu chờ duyệt", "show-requests");
+      addButton(actions, "Xóa nhóm", "delete-group", "button button-danger");
+    } else if (membershipRole === "Member") {
+      addButton(actions, "Rời nhóm", "leave-group", "button button-danger");
     } else if (membershipRole !== "Member") {
       addButton(actions, "Gửi yêu cầu tham gia", "show-join");
     }
@@ -520,7 +523,40 @@ async function handleGroupListClick(event) {
   const card = button.closest(".group-card");
   const groupId = card.dataset.groupId;
   try {
-    if (button.dataset.action === "show-join") {
+    if (button.dataset.action === "delete-group") {
+      const confirmed = window.confirm(
+        "Xóa vĩnh viễn nhóm này? Thành viên và các yêu cầu tham gia liên quan cũng sẽ bị xóa. Thao tác này không thể hoàn tác."
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      await requestJson(`${window.location.origin}/api/groups/${groupId}`, {
+        method: "DELETE"
+      });
+      showNotice("Đã xóa nhóm. Đang đồng bộ danh sách...");
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      await loadGroups();
+      if (!document.querySelector("#mine-view").hidden) {
+        await loadMyGroups();
+      }
+    } else if (button.dataset.action === "leave-group") {
+      const confirmed = window.confirm("Bạn có chắc muốn rời nhóm này không?");
+      if (!confirmed) {
+        return;
+      }
+
+      await requestJson(
+        `${window.location.origin}/api/groups/${groupId}/members/me`,
+        { method: "DELETE" }
+      );
+      showNotice("Bạn đã rời nhóm. Đang đồng bộ danh sách...");
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      await loadGroups();
+      if (!document.querySelector("#mine-view").hidden) {
+        await loadMyGroups();
+      }
+    } else if (button.dataset.action === "show-join") {
       card.querySelector(".inline-form")?.remove();
       const form = document.createElement("form");
       form.className = "inline-form";

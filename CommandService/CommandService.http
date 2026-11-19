@@ -45,6 +45,14 @@ Content-Type: application/json
   "maxMembers": 5
 }
 
+### Permanently delete a group as its owner
+DELETE {{CommandService_HostAddress}}/api/groups/{{groupId}}
+Authorization: Bearer {{token}}
+
+### Leave a group as a member (owners must delete their group instead)
+DELETE {{CommandService_HostAddress}}/api/groups/{{groupId}}/members/me
+Authorization: Bearer {{token}}
+
 ### Request to join a group as the authenticated user
 POST {{CommandService_HostAddress}}/api/groups/{{groupId}}/join-requests
 Authorization: Bearer {{token}}

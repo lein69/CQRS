@@ -21,6 +21,7 @@ namespace ConsumerService.Models
 		public string MeetingLocation { get; set; } = string.Empty;
 		public string Level { get; set; } = "All";
 		public Guid OwnerId { get; set; }
+		public string OwnerDisplayName { get; set; } = string.Empty;
 		public int MaxMembers { get; set; }
 		public string Status { get; set; } = string.Empty;
 		public DateTime CreatedAtUtc { get; set; }
